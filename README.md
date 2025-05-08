@@ -1,4 +1,124 @@
 # Wide Activation for Efficient Image and Video Super-Resolution
+
+## OpenVINO Enabling
+
+Please following below steps to enable WDSR model and run with OpenVINO.
+
+### Checkpoints
+
+Please download check below table and download checkpoint and then put into .
+
+* Small models
+
+    | Networks | Checkpoint |
+    | - | - |
+    | WDSR x2 | [Download](https://github.com/ychfan/wdsr/files/4176974/wdsr_x2.zip) |
+    | WDSR x3 | [Download](https://github.com/ychfan/wdsr/files/4176981/wdsr_x3.zip) |
+    | WDSR x4 | [Download](https://github.com/ychfan/wdsr/files/4176985/wdsr_x4.zip) |
+
+* Large models
+
+    | Networks | Checkpoint |
+    | - | - | 
+    | WDSR x2 | [Download](https://drive.google.com/file/d/10OsQD--qWZIBinFignAWwppHw5z9LPMI/view?usp=sharing) |
+    | WDSR x3 | [Download](https://drive.google.com/file/d/10Yh0mI2825k69vChRZRGMsAC7C-M5hbk/view?usp=sharing) |
+    | WDSR x4 | [Download](https://drive.google.com/file/d/10sYc5F63-o3eovtGCG5SSawk4otEHIxe/view?usp=sharing) |
+
+### Convert model to IR
+
+Please use below command to convert model, and then you can find the models under directory, `ov_models\FP16`.
+
+* Get static model:
+
+    ```py
+    python ov_convert.py --scale 3 --ckpt checkpoints/wdsr_x3/epoch_30.pth -ih 512 -iw 512
+    ```
+
+* Get dynamic model:
+
+    ```py
+    python ov_convert.py --scale 3 --ckpt checkpoints/wdsr_x3/epoch_30.pth --no-do_static
+    ```
+
+> Notes: 
+>   * Here is using scale 3 as instance.
+>   * `ov_convert.py` is based on `trainer.py`.
+
+
+### Quantization
+
+Please use below command to quantize model from __FP16__ to __INT8__ precision, and then you can find the models under directory, `ov_models\INT8`. 
+
+* Prepare dataset
+
+    Please follow directory structure below to collect your own dataset and put the image into directory, `quantization_datasets\pics4q\img`.
+
+    ```sh
+    quantization_datasets
+    └── pics4q
+        └── img
+            ├── aaa.jpg
+            ├── bbb.jpg
+            ├── ccc.jpg
+            ├──
+            ├── ...
+            ├──
+            └── xxx.jpg
+    ```
+
+* Static model:
+
+    ```py
+    python ov_convert.py -s 3 -ih 512 -iw 512
+    ```
+
+* Dynamic model:
+
+    ```py
+    python ov_quantize.py -s 3 --no-do_static
+    ```
+
+> Notes: 
+>   * Here is using scale 3 as instance.
+
+
+### Run inference
+
+Please use below command to run inference for FP16 and INT8 model. 
+
+* Run FP16 model
+
+    * Static model:
+
+        ```py
+        python ov_infer.py -s 3 -i input_imgs/input.jpg -ih 512 -iw 512
+        ```
+
+    * Dynamic model:
+
+        ```py
+        python ov_infer.py -s 3 --no-do_static -i input_imgs/input.jpg
+        ```
+
+* Run INT8 model
+
+    * Static model:
+
+        ```py
+        python ov_infer.py -s 3 -i input_imgs/input.jpg -ih 512 -iw 512 -mp INT8
+        ```
+
+    * Dynamic model:
+
+        ```py
+        python ov_infer.py -s 3 --no-do_static -i input_imgs/input.jpg -mp INT8
+        ```
+
+> Notes: 
+>   * Here is using scale 3 as instance.
+
+---
+
 Reloaded PyTorch implementation of WDSR, *BMVC 2019* [[pdf]](https://bmvc2019.org/wp-content/uploads/papers/0288-paper.pdf).
 
 [Previous Implementations](https://github.com/JiahuiYu/wdsr_ntire2018)
