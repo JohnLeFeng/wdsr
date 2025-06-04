@@ -117,6 +117,16 @@ Please use below command to run inference for FP16 and INT8 model.
 > Notes: 
 >   * Here is using scale 3 as instance.
 
+#### Fully use NPU computation capability
+
+Please following below to modify line `63` of `ov_infer.py` to make model runs with 6 tiles on LNL.
+
+```py
+compiled_model = core.compile_model(ov_model_path, "NPU"
+    {"NPU_DPU_GROUPS" : 6, "NPU_MAX_TILES": 6, "PERFORMANCE_HINT": "LATENCY"}
+)
+```
+
 ---
 
 Reloaded PyTorch implementation of WDSR, *BMVC 2019* [[pdf]](https://bmvc2019.org/wp-content/uploads/papers/0288-paper.pdf).
