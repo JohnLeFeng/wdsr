@@ -48,8 +48,8 @@ def main():
 
     if (args.do_static):
         log.info ("Using static model...")
-        ov_model_path = "./ov_models/FP16/{}_{}x_{}_{}.xml".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH)
-        quantized_model_path = "./ov_models/INT8/{}_{}x_{}_{}_int8.xml".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH)
+        ov_model_path = "./ov_models/FP16/{}_{}x_{}x{}.xml".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH)
+        quantized_model_path = "./ov_models/INT8/{}_{}x_{}x{}_int8.xml".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH)
     else:
         log.info ("Using dynamic model...")
         ov_model_path = "./ov_models/FP16/{}_{}x_dyn.xml".format(MODEL_TYPE, SCALE)

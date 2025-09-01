@@ -182,7 +182,7 @@ def main():
   torch_inputs = torch.randn((1, 3, HEIGHT, WIDTH))
 
   if (args.do_static):
-    WDSR_OV_MODEL_PATH = "./ov_models/FP16/{}_{}x_{}_{}.xml".format(args.model, args.scale, HEIGHT, WIDTH)
+    WDSR_OV_MODEL_PATH = "./ov_models/FP16/{}_{}x_{}x{}.xml".format(args.model, args.scale, HEIGHT, WIDTH)
     ov_inputs = [1, 3, HEIGHT, WIDTH]
   else:
     WDSR_OV_MODEL_PATH = "./ov_models/FP16/{}_{}x_dyn.xml".format(args.model, args.scale)

@@ -51,8 +51,8 @@ def main():
 
     if (args.do_static):
         log.info ("Using static {} model...".format(MODEL_PRECISION))
-        ov_model_path = "./ov_models/{}/{}_{}x_{}_{}.xml".format(MODEL_PRECISION, MODEL_TYPE, SCALE, HEIGHT, WIDTH)
-        output_img_path += "_{}_{}x_{}_{}_{}.jpg".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH, MODEL_PRECISION)
+        ov_model_path = "./ov_models/{}/{}_{}x_{}x{}.xml".format(MODEL_PRECISION, MODEL_TYPE, SCALE, HEIGHT, WIDTH)
+        output_img_path += "_{}_{}x_{}x{}_{}.jpg".format(MODEL_TYPE, SCALE, HEIGHT, WIDTH, MODEL_PRECISION)
     else:
         log.info ("Using dynamic {} model...".format(MODEL_PRECISION))
         ov_model_path = "./ov_models/{}/{}_{}x_dyn.xml".format(MODEL_PRECISION, MODEL_TYPE, SCALE)
