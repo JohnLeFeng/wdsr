@@ -69,7 +69,7 @@ Please use below command to quantize model from __FP16__ to __INT8__ precision, 
 * Static model:
 
     ```py
-    python ov_convert.py -s 3 -ih 512 -iw 512
+    python ov_quantize.py -s 3 -ih 512 -iw 512
     ```
 
 * Dynamic model:
