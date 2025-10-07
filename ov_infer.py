@@ -25,6 +25,9 @@ def parse_args():
                       help='Optional. Width of input.')
     args.add_argument('-mt', '--model_type', type=str, default="wdsr",
                       help='Optional. Type of wdsr model.')
+    args.add_argument('-d', '--device', type=str, default="GPU",
+                      help='Optional. Specify the target device to infer on; CPU, GPU or NPU '
+                      'is acceptable. Default value is GPU.')
     args.add_argument('-mp', '--model_precision', type=str, default="FP16",
                       help='Optional. Precision of model.')
     args.add_argument('-s', '--scale', type=int, default=2,
@@ -43,6 +46,7 @@ def main():
 
     HEIGHT = args.input_height
     WIDTH = args.input_width
+    DEVICE = args.device
     SCALE = args.scale
 
     output_img_path = (
@@ -60,7 +64,7 @@ def main():
 
 
     core = ov.Core()
-    compiled_model = core.compile_model(ov_model_path, "GPU")
+    compiled_model = core.compile_model(ov_model_path, DEVICE)
 
     img = cv2.imread(IMAGE_NAME)
     if (args.do_static):
