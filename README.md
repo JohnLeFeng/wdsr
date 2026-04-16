@@ -117,13 +117,57 @@ Please use below command to run inference for FP16 and INT8 model.
 > Notes: 
 >   * Here is using scale 3 as instance.
 
+#### NV12 video inference
+
+`ov_infer.py` also supports raw NV12 binary video files. Pass `--nv12` (or use a `.nv12` input file) to activate NV12 mode. The output is written as a raw NV12 file.
+
+> **Note:** OpenCV cannot decode raw NV12 streams. This mode reads raw bytes directly and uses OpenVINO's `PrePostProcessor` (PPP) pipeline for all frame processing — no OpenCV involvement. The PPP pipeline handles: NV12 → BGR color conversion, resize from the video frame dimensions to the model input dimensions, and element type conversion.
+
+Two sets of dimensions are used in NV12 mode:
+
+| Option | Purpose |
+| - | - |
+| `-ih` / `-iw` | Model input dimensions (static model selection or dynamic reshape target) |
+| `-ivh` / `-ivw` | Raw NV12 input frame dimensions. Defaults to `-ih` / `-iw` when not specified. |
+
+When `-ivh`/`-ivw` differ from `-ih`/`-iw`, the PPP resize step scales the decoded BGR frame to the model's expected input size before inference.
+
+* Dynamic model, process all frames (video and model share the same resolution):
+
+    ```py
+    python ov_infer.py -s 3 --no-do_static -i input_imgs/input.nv12 -ivh 320 -ivw 480 -d CPU --nv12
+    ```
+
+* Dynamic model, video 1920×1080 input scaled to 512×512 model:
+
+    ```py
+    python ov_infer.py -s 3 --no-do_static -i input_imgs/input.nv12 -ivh 1080 -ivw 1920 -ih 512 -iw 512 -d CPU --nv12
+    ```
+
+* Dynamic model, process first 10 frames:
+
+    ```py
+    python ov_infer.py -s 3 --no-do_static -i input_imgs/input.nv12 -ivh 320 -ivw 480 -d CPU --nv12 --num_frames 10
+    ```
+
+* Static model, INT8 precision:
+
+    ```py
+    python ov_infer.py -s 3 -i input_imgs/input.nv12 -ih 320 -iw 480 -ivh 320 -ivw 480 -d CPU -mp INT8 --nv12
+    ```
+
+> Notes:
+>   * `-ivh`/`-ivw` (video frame dimensions) must be even numbers.
+>   * `--num_frames` limits how many frames are processed; omit it to process the entire file.
+>   * Here is using scale 3 as instance.
+
 #### Fully use NPU computation capability
 
-Please following below to modify line `63` of `ov_infer.py` to make model runs with 6 tiles on LNL.
+Pass NPU config options via `core.compile_model` in `ov_infer.py` to run with 6 tiles on LNL:
 
 ```py
-compiled_model = core.compile_model(ov_model_path, "NPU"
-    {"NPU_DPU_GROUPS" : 6, "NPU_MAX_TILES": 6, "PERFORMANCE_HINT": "LATENCY"}
+compiled_model = core.compile_model(model, "NPU",
+    {"NPU_DPU_GROUPS": 6, "NPU_MAX_TILES": 6, "PERFORMANCE_HINT": "LATENCY"}
 )
 ```
 

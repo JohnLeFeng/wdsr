@@ -156,9 +156,9 @@ def parse_args():
     args.add_argument('-o', '--output_dir', type=str, default="output_files/",
                       help='Directory for saving the output file.')
     args.add_argument('-ih', '--input_height', type=int, default=512,
-                      help='Optional. Height of input (pixels, must be even for NV12).')
+                      help='Optional. Model input height / image resize height (pixels).')
     args.add_argument('-iw', '--input_width', type=int, default=512,
-                      help='Optional. Width of input (pixels, must be even for NV12).')
+                      help='Optional. Model input width / image resize width (pixels).')
     args.add_argument('-mt', '--model_type', type=str, default="wdsr",
                       help='Optional. Type of model.')
     args.add_argument('-d', '--device', type=str, default="GPU",
@@ -171,6 +171,10 @@ def parse_args():
                       help='Optional. Use a static-shape model (default: True).')
     args.add_argument('--nv12', default=False, action=argparse.BooleanOptionalAction,
                       help='Optional. Process input as a raw NV12 binary video file.')
+    args.add_argument('-ivh', '--input_video_height', type=int, default=None,
+                      help='Optional. Height of raw NV12 input frames (pixels, must be even). Defaults to -ih if not set.')
+    args.add_argument('-ivw', '--input_video_width', type=int, default=None,
+                      help='Optional. Width of raw NV12 input frames (pixels, must be even). Defaults to -iw if not set.')
     args.add_argument('--num_frames', type=int, default=None,
                       help='Optional. Maximum number of NV12 frames to process (NV12 mode only).')
     return parser.parse_args()
@@ -181,13 +185,17 @@ def parse_args():
 # ---------------------------------------------------------------------------
 
 def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
-    input_width  = args.input_width
-    input_height = args.input_height
+    # Raw NV12 frame dimensions (from -ivh/-ivw, fall back to -ih/-iw)
+    video_width  = args.input_video_width  if args.input_video_width  is not None else args.input_width
+    video_height = args.input_video_height if args.input_video_height is not None else args.input_height
+    # Model input dimensions (from -ih/-iw)
+    model_width  = args.input_width
+    model_height = args.input_height
 
-    if input_width % 2 != 0 or input_height % 2 != 0:
-        raise ValueError("NV12 mode requires even width and height.")
+    if video_width % 2 != 0 or video_height % 2 != 0:
+        raise ValueError("NV12 mode requires even video frame width and height.")
 
-    input_nv12_frame_size = input_width * input_height * 3 // 2
+    input_nv12_frame_size = video_width * video_height * 3 // 2
 
     if not INPUT_NAME.is_file():
         raise FileNotFoundError(f"Input file not found: {INPUT_NAME}")
@@ -197,12 +205,13 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
     if total_frames == 0:
         raise ValueError(
             f"File size ({file_size} bytes) is smaller than one NV12 frame "
-            f"({input_nv12_frame_size} bytes for {input_width}x{input_height})"
+            f"({input_nv12_frame_size} bytes for {video_width}x{video_height})"
         )
 
     frames_to_process = total_frames if args.num_frames is None else min(args.num_frames, total_frames)
 
-    log.info("NV12 mode: %dx%d, %d frames to process.", input_width, input_height, frames_to_process)
+    log.info("NV12 mode: video %dx%d -> model %dx%d, %d frames to process.",
+             video_width, video_height, model_width, model_height, frames_to_process)
 
     core  = ov.Core()
     model = core.read_model(ov_model_path)
@@ -217,7 +226,7 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
     model_input_layout = get_model_input_layout(input_port)
 
     if input_port.partial_shape.is_dynamic:
-        reshaped = build_reshaped_input_shape(input_port, model_input_layout, input_height, input_width)
+        reshaped = build_reshaped_input_shape(input_port, model_input_layout, model_height, model_width)
         log.info("Reshaping dynamic model input to: %s", reshaped)
         model.reshape({input_tensor_name: reshaped})
         input_port         = model.input()
@@ -228,10 +237,12 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
 
     ppp        = PrePostProcessor(model)
     input_info = ppp.input(input_tensor_name)
+    # Set tensor to the raw NV12 frame dimensions
     input_info.tensor() \
         .set_element_type(ov.Type.u8) \
         .set_color_format(ColorFormat.NV12_SINGLE_PLANE) \
-        .set_spatial_static_shape(input_height, input_width)
+        .set_spatial_static_shape(video_height, video_width)
+    # PPP converts NV12 -> BGR and resizes to the model's expected dimensions
     input_info.preprocess() \
         .convert_element_type(ov.Type.f32) \
         .convert_color(ColorFormat.BGR) \
@@ -254,7 +265,7 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
                 break
 
             nv12_array  = np.frombuffer(raw_data, dtype=np.uint8).reshape(
-                (1, input_height * 3 // 2, input_width, 1)
+                (1, video_height * 3 // 2, video_width, 1)
             )
             nv12_tensor = ov.Tensor(nv12_array)
 
@@ -267,7 +278,7 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
 
             out_f.write(bgr_to_nv12(output_image_bgr))
             processed += 1
-            log.info("Frame %d: %dx%d -> %dx%d", frame_idx, input_width, input_height, output_width, output_height)
+            log.info("Frame %d: %dx%d -> %dx%d", frame_idx, video_width, video_height, output_width, output_height)
 
     if output_width is None or output_height is None:
         raise RuntimeError("No output frames were produced.")
