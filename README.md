@@ -171,6 +171,53 @@ compiled_model = core.compile_model(model, "NPU",
 )
 ```
 
+## Tools
+
+### PSNR Evaluation Script for NV12 Video
+
+Evaluates Peak Signal-to-Noise Ratio (PSNR) values for NV12 format videos by comparing two video files.
+
+#### Usage
+
+```bash
+python psnr_eval.py <reference_video> <test_video> [--width W] [--height H] [--start-frame N] [--end-frame N] [--output-csv file.csv] [--output-json file.json]
+```
+
+#### Parameters
+
+- `reference_video`: Path to reference NV12 video file
+- `test_video`: Path to test NV12 video file
+- `--width`: Video width (default: 1920)
+- `--height`: Video height (default: 1080)
+- `--start-frame`: Optional start frame (default: 0)
+- `--end-frame`: Optional end frame (default: all frames)
+- `--output-csv`: Optional CSV output file path
+- `--output-json`: Optional JSON output file path
+
+#### Output
+
+Console output shows per-frame PSNR values and overall statistics for Y, U, V components.
+
+#### Examples
+
+```bash
+# Compare two videos, all frames
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080
+
+# Compare frames 10-100, save to CSV
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --start-frame 10 --end-frame 100 --output-csv results.csv
+
+# Save results as JSON
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --output-json results.json
+```
+
+#### Notes
+
+- NV12 is a 4:2:0 YUV format with full-resolution Y plane and half-resolution interleaved UV plane
+- PSNR values are reported in dB; identical frames report 100.0 dB
+- U and V planes are half the height/width of the Y plane due to 4:2:0 subsampling
+
+
 ---
 
 Reloaded PyTorch implementation of WDSR, *BMVC 2019* [[pdf]](https://bmvc2019.org/wp-content/uploads/papers/0288-paper.pdf).
