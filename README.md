@@ -218,6 +218,62 @@ python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --output-json re
 - U and V planes are half the height/width of the Y plane due to 4:2:0 subsampling
 
 
+### NV12 to JPG Frame Extraction Script
+
+A Python utility to extract individual frames from raw NV12 video files, convert them to RGB, and save as JPG images.
+
+#### Overview
+
+This script is designed for developers and testers working with Intel® VPL (Video Processing Library) who need to quickly visualize individual frames from raw NV12 video data. NV12 is a planar YUV 4:2:0 format commonly used in video processing.
+
+**Key Features:**
+- Extract specific frames by frame number
+- Convert NV12 (YUV 4:2:0) to RGB using ITU-R BT.601 standard
+- Adjustable JPG quality output
+- Comprehensive error handling with clear messages
+- Works with any even-dimensioned frame size
+
+#### Usage
+
+##### Required Arguments
+
+- `--input <file>` — Path to raw NV12 file
+- `--width <w>` — Frame width in pixels (must be even)
+- `--height <h>` — Frame height in pixels (must be even)
+- `--frame <n>` — Frame number to extract (0-indexed, non-negative)
+
+##### Optional Arguments
+
+- `--output <jpg>` — Output JPG path (default: `frame_<n>.jpg` in current directory)
+- `--quality <q>` — JPG quality level 1-100 (default: 95)
+
+#### Examples
+
+##### Extract frame 0 from a 1920×1080 NV12 file
+
+```bash
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0
+# Output: frame_0.jpg
+```
+
+##### Extract frame 100 with custom output path and lower quality
+
+```bash
+python nv12_to_jpg.py \
+  --input video.nv12 \
+  --width 1920 \
+  --height 1080 \
+  --frame 100 \
+  --output my_frame_100.jpg \
+  --quality 85
+```
+
+##### Extract frame from 1280×720 video
+
+```bash
+python nv12_to_jpg.py --input hd_video.nv12 --width 1280 --height 720 --frame 10 --output frame_10.jpg
+```
+
 ---
 
 Reloaded PyTorch implementation of WDSR, *BMVC 2019* [[pdf]](https://bmvc2019.org/wp-content/uploads/papers/0288-paper.pdf).
