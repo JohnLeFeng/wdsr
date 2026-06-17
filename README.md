@@ -220,14 +220,14 @@ python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --output-json re
 
 ### NV12 to JPG Frame Extraction Script
 
-A Python utility to extract individual frames from raw NV12 video files, convert them to RGB, and save as JPG images.
+A Python utility to extract one or more frames from raw NV12 video files, convert them to RGB, and save as JPG images.
 
 #### Overview
 
-This script is designed for developers and testers working with Intel® VPL (Video Processing Library) who need to quickly visualize individual frames from raw NV12 video data. NV12 is a planar YUV 4:2:0 format commonly used in video processing.
+This script is designed for developers and testers working with Intel® VPL (Video Processing Library) who need to quickly visualize frames from raw NV12 video data. NV12 is a planar YUV 4:2:0 format commonly used in video processing.
 
 **Key Features:**
-- Extract specific frames by frame number
+- Extract a single frame, multiple specific frames, or a contiguous range of frames
 - Convert NV12 (YUV 4:2:0) to RGB using ITU-R BT.601 standard
 - Adjustable JPG quality output
 - Comprehensive error handling with clear messages
@@ -235,43 +235,56 @@ This script is designed for developers and testers working with Intel® VPL (Vid
 
 #### Usage
 
+```bash
+python nv12_to_jpg.py --input <file> --width <w> --height <h> (--frame <n> [<n> ...] | --frame-range <start> <end>) [--output <path>] [--quality <q>]
+```
+
 ##### Required Arguments
 
 - `--input <file>` — Path to raw NV12 file
 - `--width <w>` — Frame width in pixels (must be even)
 - `--height <h>` — Frame height in pixels (must be even)
-- `--frame <n>` — Frame number to extract (0-indexed, non-negative)
+
+##### Frame Selection (mutually exclusive, one required)
+
+- `--frame <n> [<n> ...]` — One or more frame numbers to extract (0-indexed)
+- `--frame-range <start> <end>` — Inclusive range of frames to extract
 
 ##### Optional Arguments
 
-- `--output <jpg>` — Output JPG path (default: `frame_<n>.jpg` in current directory)
+- `--output <path>` — Output path:
+  - Single frame + `.jpg`/`.jpeg` extension → saved to that exact file
+  - Multiple frames + path → treated as a directory; files named `frame_<n>.jpg`
+  - Omitted → `frame_<n>.jpg` in the current directory
 - `--quality <q>` — JPG quality level 1-100 (default: 95)
 
 #### Examples
 
-##### Extract frame 0 from a 1920×1080 NV12 file
+##### Extract a single frame
 
 ```bash
 python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0
 # Output: frame_0.jpg
 ```
 
-##### Extract frame 100 with custom output path and lower quality
+##### Extract multiple specific frames into a directory
 
 ```bash
-python nv12_to_jpg.py \
-  --input video.nv12 \
-  --width 1920 \
-  --height 1080 \
-  --frame 100 \
-  --output my_frame_100.jpg \
-  --quality 85
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0 50 100 150 --output ./frames
+# Output: frames/frame_0.jpg, frames/frame_50.jpg, frames/frame_100.jpg, frames/frame_150.jpg
 ```
 
-##### Extract frame from 1280×720 video
+##### Extract a range of frames (frames 0–49)
 
 ```bash
-python nv12_to_jpg.py --input hd_video.nv12 --width 1280 --height 720 --frame 10 --output frame_10.jpg
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame-range 0 49 --output ./frames
+# Output: frames/frame_0.jpg … frames/frame_49.jpg
+```
+
+##### Single frame with custom output path and quality
+
+```bash
+python nv12_to_jpg.py --input hd_video.nv12 --width 1280 --height 720 --frame 10 --output frame_10.jpg --quality 85
 ```
 
 ---

@@ -2,11 +2,12 @@
 """
 NV12 to JPG Frame Extraction Script
 
-Extracts a specific frame from raw NV12 video data, converts to RGB using
+Extracts one or more frames from raw NV12 video data, converts to RGB using
 ITU-R BT.601 standard, and saves as JPG.
 
 Usage:
-    python nv12_to_jpg.py --input <file> --width <w> --height <h> --frame <n> [--output <jpg>] [--quality <q>]
+    python nv12_to_jpg.py --input <file> --width <w> --height <h> --frame <n> [<n> ...] [--output <dir_or_jpg>] [--quality <q>]
+    python nv12_to_jpg.py --input <file> --width <w> --height <h> --frame-range <start> <end> [--output <dir>] [--quality <q>]
 """
 
 import argparse
@@ -28,7 +29,16 @@ Examples:
   # Extract frame 10 from 1920x1080 NV12
   python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 10
 
-  # With custom output and quality
+  # Extract frames 0, 5, and 10
+  python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0 5 10
+
+  # Extract frames 0 through 9 (inclusive) using a range
+  python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame-range 0 9
+
+  # Save multiple frames to a specific output directory
+  python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0 1 2 --output ./frames
+
+  # Single frame with custom output path and quality
   python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0 --output my_frame.jpg --quality 90
         """,
     )
@@ -51,17 +61,26 @@ Examples:
         required=True,
         help="Frame height in pixels (must be even)",
     )
-    parser.add_argument(
+    frame_group = parser.add_mutually_exclusive_group(required=True)
+    frame_group.add_argument(
         "--frame",
         type=int,
-        required=True,
-        help="Frame number to extract (0-indexed)",
+        nargs="+",
+        metavar="N",
+        help="One or more frame numbers to extract (0-indexed)",
+    )
+    frame_group.add_argument(
+        "--frame-range",
+        type=int,
+        nargs=2,
+        metavar=("START", "END"),
+        help="Inclusive range of frames to extract (e.g. --frame-range 0 9)",
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Output JPG path (default: frame_<n>.jpg)",
+        help="Output path: a directory for multiple frames, or a .jpg path for a single frame (default: frame_<n>.jpg)",
     )
     parser.add_argument(
         "--quality",
@@ -73,6 +92,16 @@ Examples:
     return parser.parse_args()
 
 
+def resolve_frames(args):
+    """Return a sorted, deduplicated list of frame numbers from args."""
+    if args.frame_range is not None:
+        start, end = args.frame_range
+        if start > end:
+            raise ValueError(f"--frame-range start ({start}) must be <= end ({end})")
+        return list(range(start, end + 1))
+    return sorted(set(args.frame))
+
+
 def validate_args(args):
     """Validate command-line arguments. Raises ValueError on invalid input."""
     # Check width and height are even
@@ -81,10 +110,6 @@ def validate_args(args):
 
     if args.height <= 0 or args.height % 2 != 0:
         raise ValueError(f"Height must be positive and even, got {args.height}")
-
-    # Check frame number
-    if args.frame < 0:
-        raise ValueError(f"Frame number must be non-negative, got {args.frame}")
 
     # Check quality
     if not (1 <= args.quality <= 100):
@@ -98,16 +123,21 @@ def validate_args(args):
     if not input_path.is_file():
         raise ValueError(f"Input path is not a file: {args.input}")
 
-    # Check file size is sufficient
+    frames = resolve_frames(args)
+
+    # Check all frame numbers are valid and within file bounds
     bytes_per_frame = args.width * args.height * 3 // 2
-    expected_offset = args.frame * bytes_per_frame
     file_size = input_path.stat().st_size
 
-    if expected_offset + bytes_per_frame > file_size:
-        raise ValueError(
-            f"File too small: frame {args.frame} requires {expected_offset + bytes_per_frame} bytes, "
-            f"but file is only {file_size} bytes"
-        )
+    for frame_num in frames:
+        if frame_num < 0:
+            raise ValueError(f"Frame number must be non-negative, got {frame_num}")
+        expected_end = (frame_num + 1) * bytes_per_frame
+        if expected_end > file_size:
+            raise ValueError(
+                f"File too small: frame {frame_num} requires {expected_end} bytes, "
+                f"but file is only {file_size} bytes"
+            )
 
 
 def extract_nv12_frame(filepath, width, height, frame_num):
@@ -216,31 +246,43 @@ def save_jpg(rgb_array, output_path, quality):
     image.save(output_path, format="JPEG", quality=quality)
 
 
+def resolve_output_path(args, frame_num, frames):
+    """
+    Determine the output file path for a given frame.
+
+    - Single frame + --output ending in .jpg/.jpeg: use as-is.
+    - Multiple frames + --output: treat --output as a directory.
+    - No --output: write frame_<n>.jpg in the current directory.
+    """
+    if args.output:
+        out = Path(args.output)
+        if len(frames) == 1 and out.suffix.lower() in (".jpg", ".jpeg"):
+            return str(out)
+        # Treat as directory
+        out.mkdir(parents=True, exist_ok=True)
+        return str(out / f"frame_{frame_num}.jpg")
+    return f"frame_{frame_num}.jpg"
+
+
 def main():
     """Main entry point."""
     try:
         args = parse_args()
         validate_args(args)
 
-        # Determine output path
-        if args.output:
-            output_path = args.output
-        else:
-            output_path = f"frame_{args.frame}.jpg"
+        frames = resolve_frames(args)
+        total = len(frames)
+        print(f"Extracting {total} frame(s) from {args.input}...")
 
-        # Extract frame
-        print(f"Extracting frame {args.frame} from {args.input}...")
-        y, u, v = extract_nv12_frame(args.input, args.width, args.height, args.frame)
+        for idx, frame_num in enumerate(frames, 1):
+            output_path = resolve_output_path(args, frame_num, frames)
 
-        # Convert to RGB
-        print("Converting NV12 to RGB...")
-        rgb = nv12_to_rgb(y, u, v)
+            print(f"[{idx}/{total}] Frame {frame_num} -> {output_path}")
+            y, u, v = extract_nv12_frame(args.input, args.width, args.height, frame_num)
+            rgb = nv12_to_rgb(y, u, v)
+            save_jpg(rgb, output_path, args.quality)
 
-        # Save as JPG
-        print(f"Saving to {output_path} (quality={args.quality})...")
-        save_jpg(rgb, output_path, args.quality)
-
-        print(f"Success! Frame saved to {output_path}")
+        print(f"Done. {total} frame(s) saved.")
         return 0
 
     except ValueError as e:
