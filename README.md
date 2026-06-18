@@ -171,6 +171,122 @@ compiled_model = core.compile_model(model, "NPU",
 )
 ```
 
+## Tools
+
+### PSNR Evaluation Script for NV12 Video
+
+Evaluates Peak Signal-to-Noise Ratio (PSNR) values for NV12 format videos by comparing two video files.
+
+#### Usage
+
+```bash
+python psnr_eval.py <reference_video> <test_video> [--width W] [--height H] [--start-frame N] [--end-frame N] [--output-csv file.csv] [--output-json file.json]
+```
+
+#### Parameters
+
+- `reference_video`: Path to reference NV12 video file
+- `test_video`: Path to test NV12 video file
+- `--width`: Video width (default: 1920)
+- `--height`: Video height (default: 1080)
+- `--start-frame`: Optional start frame (default: 0)
+- `--end-frame`: Optional end frame (default: all frames)
+- `--output-csv`: Optional CSV output file path
+- `--output-json`: Optional JSON output file path
+
+#### Output
+
+Console output shows per-frame PSNR values and overall statistics for Y, U, V components.
+
+#### Examples
+
+```bash
+# Compare two videos, all frames
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080
+
+# Compare frames 10-100, save to CSV
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --start-frame 10 --end-frame 100 --output-csv results.csv
+
+# Save results as JSON
+python psnr_eval.py ref.yuv test.yuv --width 1920 --height 1080 --output-json results.json
+```
+
+#### Notes
+
+- NV12 is a 4:2:0 YUV format with full-resolution Y plane and half-resolution interleaved UV plane
+- PSNR values are reported in dB; identical frames report 100.0 dB
+- U and V planes are half the height/width of the Y plane due to 4:2:0 subsampling
+
+
+### NV12 to JPG Frame Extraction Script
+
+A Python utility to extract one or more frames from raw NV12 video files, convert them to RGB, and save as JPG images.
+
+#### Overview
+
+This script is designed for developers and testers working with Intel® VPL (Video Processing Library) who need to quickly visualize frames from raw NV12 video data. NV12 is a planar YUV 4:2:0 format commonly used in video processing.
+
+**Key Features:**
+- Extract a single frame, multiple specific frames, or a contiguous range of frames
+- Convert NV12 (YUV 4:2:0) to RGB using ITU-R BT.601 standard
+- Adjustable JPG quality output
+- Comprehensive error handling with clear messages
+- Works with any even-dimensioned frame size
+
+#### Usage
+
+```bash
+python nv12_to_jpg.py --input <file> --width <w> --height <h> (--frame <n> [<n> ...] | --frame-range <start> <end>) [--output <path>] [--quality <q>]
+```
+
+##### Required Arguments
+
+- `--input <file>` — Path to raw NV12 file
+- `--width <w>` — Frame width in pixels (must be even)
+- `--height <h>` — Frame height in pixels (must be even)
+
+##### Frame Selection (mutually exclusive, one required)
+
+- `--frame <n> [<n> ...]` — One or more frame numbers to extract (0-indexed)
+- `--frame-range <start> <end>` — Inclusive range of frames to extract
+
+##### Optional Arguments
+
+- `--output <path>` — Output path:
+  - Single frame + `.jpg`/`.jpeg` extension → saved to that exact file
+  - Multiple frames + path → treated as a directory; files named `frame_<n>.jpg`
+  - Omitted → `frame_<n>.jpg` in the current directory
+- `--quality <q>` — JPG quality level 1-100 (default: 95)
+
+#### Examples
+
+##### Extract a single frame
+
+```bash
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0
+# Output: frame_0.jpg
+```
+
+##### Extract multiple specific frames into a directory
+
+```bash
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame 0 50 100 150 --output ./frames
+# Output: frames/frame_0.jpg, frames/frame_50.jpg, frames/frame_100.jpg, frames/frame_150.jpg
+```
+
+##### Extract a range of frames (frames 0–49)
+
+```bash
+python nv12_to_jpg.py --input video.nv12 --width 1920 --height 1080 --frame-range 0 49 --output ./frames
+# Output: frames/frame_0.jpg … frames/frame_49.jpg
+```
+
+##### Single frame with custom output path and quality
+
+```bash
+python nv12_to_jpg.py --input hd_video.nv12 --width 1280 --height 720 --frame 10 --output frame_10.jpg --quality 85
+```
+
 ---
 
 Reloaded PyTorch implementation of WDSR, *BMVC 2019* [[pdf]](https://bmvc2019.org/wp-content/uploads/papers/0288-paper.pdf).
