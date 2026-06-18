@@ -120,24 +120,34 @@ def bgr_to_nv12(image_bgr: np.ndarray) -> bytes:
         raise ValueError(f"NV12 requires even width and height, got: {width}x{height}")
 
     image = image_bgr.astype(np.float32)
-    blue  = image[:, :, 0]
+    blue = image[:, :, 0]
     green = image[:, :, 1]
-    red   = image[:, :, 2]
+    red = image[:, :, 2]
 
-    y_plane = 0.114 * blue + 0.587 * green + 0.299 * red
-    u_plane = 128.0 - 0.081312 * red - 0.418688 * green + 0.5 * blue
-    v_plane = 128.0 + 0.5 * red - 0.331264 * green - 0.168736 * blue
+    y_plane = 16.0 + 0.257 * red + 0.504 * green + 0.098 * blue
+    u_plane = 128.0 - 0.148 * red - 0.291 * green + 0.439 * blue
+    v_plane = 128.0 + 0.439 * red - 0.368 * green - 0.071 * blue
 
     y_plane = np.clip(y_plane, 0.0, 255.0).astype(np.uint8)
     u_plane = np.clip(u_plane, 0.0, 255.0)
     v_plane = np.clip(v_plane, 0.0, 255.0)
 
-    u_sub = (u_plane[0::2, 0::2] + u_plane[0::2, 1::2] + u_plane[1::2, 0::2] + u_plane[1::2, 1::2]) * 0.25
-    v_sub = (v_plane[0::2, 0::2] + v_plane[0::2, 1::2] + v_plane[1::2, 0::2] + v_plane[1::2, 1::2]) * 0.25
+    u_subsampled = (
+        u_plane[0::2, 0::2]
+        + u_plane[0::2, 1::2]
+        + u_plane[1::2, 0::2]
+        + u_plane[1::2, 1::2]
+    ) * 0.25
+    v_subsampled = (
+        v_plane[0::2, 0::2]
+        + v_plane[0::2, 1::2]
+        + v_plane[1::2, 0::2]
+        + v_plane[1::2, 1::2]
+    ) * 0.25
 
     uv_plane = np.empty((height // 2, width), dtype=np.uint8)
-    uv_plane[:, 0::2] = np.clip(u_sub, 0.0, 255.0).astype(np.uint8)
-    uv_plane[:, 1::2] = np.clip(v_sub, 0.0, 255.0).astype(np.uint8)
+    uv_plane[:, 0::2] = np.clip(u_subsampled, 0.0, 255.0).astype(np.uint8)
+    uv_plane[:, 1::2] = np.clip(v_subsampled, 0.0, 255.0).astype(np.uint8)
 
     return y_plane.tobytes() + uv_plane.tobytes()
 
