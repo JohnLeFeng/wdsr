@@ -379,7 +379,7 @@ def run_standard(args, INPUT_NAME, ov_model_path, output_file_path):
                 f"[{args.dyn_min}, {args.dyn_max}]."
             )
 
-    compile_config = {"PERFORMANCE_HINT": "LATENCY"} if device == "NPU" else {}
+    compile_config = {"PERFORMANCE_HINT": "LATENCY", "NPU_COMPILER_TYPE": "PLUGIN"} if device == "NPU" else {}
     compiled_model = core.compile_model(model, args.device, compile_config)
 
     cap = cv2.VideoCapture(str(INPUT_NAME))
