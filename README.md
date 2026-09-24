@@ -117,7 +117,25 @@ Please use below command to run inference for FP16 and INT8 model.
 > Notes: 
 >   * Here is using scale 3 as instance.
 
-#### NV12 video inference
+#### NPU dynamic shape (INT8)
+
+OpenVINO 2026.4+ supports dynamic shapes on the NPU, but the NPU requires
+**bounded** dynamic dimensions (a range) instead of the fully unbounded `-1`
+dims used by CPU/GPU. When running a dynamic model on the NPU, `ov_infer.py`
+reshapes the input to a bounded dynamic shape `[1, 3, dyn_min..dyn_max, dyn_min..dyn_max]`
+so the NPU can process any input size within the range without recompiling.
+
+* Run the dynamic INT8 model on the NPU for inputs from 100×100 to 600×600:
+
+    ```py
+    python ov_infer.py -s 2 --no-do_static -i input_imgs/input.jpg -mp INT8 -d NPU --dyn_min 100 --dyn_max 600
+    ```
+
+> Notes:
+>   * `--dyn_min` / `--dyn_max` default to `100` / `600`.
+>   * The input image (or video frame) resolution must fall within `[dyn_min, dyn_max]`; otherwise inference raises an error.
+>   * CPU/GPU keep using the unbounded dynamic model and ignore these bounds.
+
 
 `ov_infer.py` also supports raw NV12 binary video files. Pass `--nv12` (or use a `.nv12` input file) to activate NV12 mode. The output is written as a raw NV12 file.
 

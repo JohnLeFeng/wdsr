@@ -78,6 +78,43 @@ def build_reshaped_input_shape(port, layout: str, input_height: int, input_width
     ]
 
 
+def build_bounded_dynamic_shape(port, layout: str, min_dim: int, max_dim: int) -> ov.PartialShape:
+    """Build a bounded dynamic 4D PartialShape with H/W in [min_dim, max_dim].
+
+    NPU dynamic shapes require bounded dimensions (a range) rather than the
+    fully unbounded -1 dimensions used by CPU/GPU.
+    """
+    partial_shape = port.partial_shape
+    if len(partial_shape) != 4:
+        raise ValueError(f"Only 4D input tensors are supported for reshape, got: {partial_shape}")
+    if min_dim <= 0 or max_dim <= 0 or min_dim > max_dim:
+        raise ValueError(f"Invalid dynamic bounds: {min_dim}..{max_dim}")
+
+    try:
+        static_shape = list(port.shape)
+    except RuntimeError:
+        static_shape = [None] * 4
+
+    def get_static_or_default(index: int, default_value: int) -> int:
+        value = static_shape[index]
+        return default_value if value is None else int(value)
+
+    spatial = ov.Dimension(min_dim, max_dim)
+    if layout == "NHWC":
+        return ov.PartialShape([
+            get_static_or_default(0, 1),
+            spatial,
+            spatial,
+            get_static_or_default(3, 3),
+        ])
+    return ov.PartialShape([
+        get_static_or_default(0, 1),
+        get_static_or_default(1, 3),
+        spatial,
+        spatial,
+    ])
+
+
 def tensor_to_hwc_image(output_data: np.ndarray) -> np.ndarray:
     """Convert a model output tensor to an HWC uint8 BGR image."""
     array = np.array(output_data)
@@ -179,6 +216,10 @@ def parse_args():
                       help='Optional. Scale factor for super-resolution.')
     args.add_argument('-ds', '--do_static', default=True, action=argparse.BooleanOptionalAction,
                       help='Optional. Use a static-shape model (default: True).')
+    args.add_argument('--dyn_min', type=int, default=100,
+                      help='Optional. Minimum spatial dimension (H/W) for NPU bounded dynamic shape. Default: 100.')
+    args.add_argument('--dyn_max', type=int, default=600,
+                      help='Optional. Maximum spatial dimension (H/W) for NPU bounded dynamic shape. Default: 600.')
     args.add_argument('--nv12', default=False, action=argparse.BooleanOptionalAction,
                       help='Optional. Process input as a raw NV12 binary video file.')
     args.add_argument('-ivh', '--input_video_height', type=int, default=None,
@@ -260,7 +301,8 @@ def run_nv12(args, INPUT_NAME, ov_model_path, output_file_path):
     input_info.model().set_layout(ov.Layout(model_input_layout))
     model = ppp.build()
 
-    compiled_model = core.compile_model(model, args.device)
+    compile_config = {"PERFORMANCE_HINT": "LATENCY"} if args.device.upper() == "NPU" else {}
+    compiled_model = core.compile_model(model, args.device, compile_config)
     infer_request  = compiled_model.create_infer_request()
 
     output_file_path += ".nv12"
@@ -311,7 +353,34 @@ def run_standard(args, INPUT_NAME, ov_model_path, output_file_path):
 
     core           = ov.Core()
     model          = core.read_model(ov_model_path)
-    compiled_model = core.compile_model(model, args.device)
+
+    input_port         = model.input()
+    input_tensor_name  = input_port.get_any_name()
+    model_input_layout = get_model_input_layout(input_port)
+    device             = args.device.upper()
+
+    # NPU requires bounded dynamic dimensions (a range) rather than the fully
+    # unbounded -1 dims that CPU/GPU accept. Reshape a dynamic model to a
+    # bounded dynamic shape so the NPU can run any size in [dyn_min, dyn_max]
+    # without recompiling per frame.
+    npu_bounded_dynamic = (not args.do_static) and device == "NPU" and input_port.partial_shape.is_dynamic
+    if npu_bounded_dynamic:
+        bounded = build_bounded_dynamic_shape(
+            input_port, model_input_layout, args.dyn_min, args.dyn_max)
+        log.info("Reshaping dynamic model input to bounded dynamic shape for NPU: %s", bounded)
+        model.reshape({input_tensor_name: bounded})
+
+    def check_bounds(height: int, width: int) -> None:
+        if npu_bounded_dynamic and not (
+            args.dyn_min <= height <= args.dyn_max and args.dyn_min <= width <= args.dyn_max
+        ):
+            raise ValueError(
+                f"Input {width}x{height} is outside the NPU dynamic bounds "
+                f"[{args.dyn_min}, {args.dyn_max}]."
+            )
+
+    compile_config = {"PERFORMANCE_HINT": "LATENCY"} if device == "NPU" else {}
+    compiled_model = core.compile_model(model, args.device, compile_config)
 
     cap = cv2.VideoCapture(str(INPUT_NAME))
     if cap.isOpened():
@@ -331,6 +400,7 @@ def run_standard(args, INPUT_NAME, ov_model_path, output_file_path):
                 if ret:
                     if args.do_static:
                         frame = cv2.resize(frame, (WIDTH, HEIGHT))
+                    check_bounds(frame.shape[0], frame.shape[1])
                     result = compiled_model(np.expand_dims(np.transpose(frame, (2, 0, 1)), 0))[0]
                     result_frame = np.clip(np.transpose(result[0] * 255, (1, 2, 0)), 0, 255).astype(np.uint8)
                     OUTPUT_VIDEO.write(result_frame)
@@ -341,6 +411,7 @@ def run_standard(args, INPUT_NAME, ov_model_path, output_file_path):
             img = cv2.imread(str(INPUT_NAME))
             if args.do_static:
                 img = cv2.resize(img, (WIDTH, HEIGHT))
+            check_bounds(img.shape[0], img.shape[1])
             result       = compiled_model(np.expand_dims(np.transpose(img, (2, 0, 1)), 0))[0]
             result_image = np.transpose(result[0] * 255, (1, 2, 0))
             cv2.imwrite(output_file_path, result_image)
